@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"github.com/q-controller/qemu-client/pkg/utils"
 )
@@ -41,6 +42,37 @@ func qmpSocketFor(name string) string {
 
 func qgaSocketFor(name string) string {
 	return fmt.Sprintf("/tmp/qga-%s.sock", name)
+}
+
+func Attach(name string, pid int) (*Instance, error) {
+	proc, procErr := os.FindProcess(pid)
+	if procErr != nil {
+		return nil, procErr
+	}
+
+	ch := make(chan interface{})
+
+	go func() {
+		defer close(ch)
+
+		for {
+			err := proc.Signal(syscall.Signal(0)) // no-op signal
+			if err != nil {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		ch <- true
+	}()
+
+	return &Instance{
+		QMP:    qmpSocketFor(name),
+		QGA:    qgaSocketFor(name),
+		Pid:    pid,
+		Done:   ch,
+		Stderr: errFileFor(name),
+		Stdout: outFileFor(name),
+	}, nil
 }
 
 func Start(name, url string, redirect bool, config Config) (*Instance, error) {
