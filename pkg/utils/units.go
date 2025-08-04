@@ -2,20 +2,29 @@ package utils
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/dustin/go-humanize"
 )
 
-func ParseMb(sizeStr string) (float64, error) {
+func ParseMb(sizeStr string) (uint64, error) {
 	// Parse the string into bytes
 	bytes, err := humanize.ParseBytes(sizeStr)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse size: %v", err)
 	}
 
-	// Convert bytes to megabytes (1 MB = 1024 * 1024 bytes)
+	return BytesToMb(bytes), nil
+}
+
+// Convert bytes to megabytes (1 MB = 1024 * 1024 bytes)
+func BytesToMb(bytes uint64) uint64 {
 	megabytes := float64(bytes) / (1024 * 1024)
-	return megabytes, nil
+	return uint64(math.Ceil(megabytes/10) * 10)
+}
+
+func MbToBytes(mb uint64) uint64 {
+	return mb * (1024 * 1024)
 }
 
 func FormatMb(megabytes uint32) string {

@@ -53,6 +53,8 @@ func Start(name, url string, config Config) (*Instance, error) {
 		Machine("q35"),
 		Accelerator(utils.GetAccelerator()),
 		Memory(config.Memory),
+		Disk(config.Disk),
+		Cpus(int(config.Cpus)),
 		Network(NetworkConfig{
 			Mac:    config.HwAddr,
 			Driver: "virtio-net",
