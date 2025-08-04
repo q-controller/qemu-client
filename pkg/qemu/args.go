@@ -88,6 +88,12 @@ func Memory(memory string) Option {
 	}
 }
 
+func Disk(disk string) Option {
+	return func(config *QemuConfig) {
+		config.Hardware.Disk = disk
+	}
+}
+
 func Cpus(cpus int) Option {
 	return func(config *QemuConfig) {
 		config.Hardware.Cpus = cpus
@@ -115,6 +121,23 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 
 	for _, opt := range opts {
 		opt(config)
+	}
+
+	image := utils.Image{
+		Path: config.Image,
+	}
+
+	if info, infoErr := image.Info(); infoErr == nil {
+		fmt.Println(info)
+		if disk, diskErr := utils.ParseMb(config.Hardware.Disk); diskErr == nil {
+			if utils.BytesToMb(info.VirtualSizeBytes) < disk {
+				if resizeErr := image.Resize(utils.MbToBytes(disk)); resizeErr != nil {
+					return nil, resizeErr
+				}
+			}
+		} else {
+			fmt.Println(diskErr)
+		}
 	}
 
 	args := []string{}
