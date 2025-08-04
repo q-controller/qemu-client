@@ -12,12 +12,10 @@ import (
 )
 
 type Instance struct {
-	QMP    string
-	QGA    string
-	Pid    int
-	Done   <-chan interface{}
-	Stderr string
-	Stdout string
+	QMP  string
+	QGA  string
+	Pid  int
+	Done <-chan interface{}
 }
 
 type Config struct {
@@ -26,14 +24,6 @@ type Config struct {
 	Disk     string
 	UserData string
 	HwAddr   string
-}
-
-func outFileFor(name string) string {
-	return fmt.Sprintf("/tmp/%s.out", name)
-}
-
-func errFileFor(name string) string {
-	return fmt.Sprintf("/tmp/%s.err", name)
 }
 
 func qmpSocketFor(name string) string {
@@ -66,16 +56,14 @@ func Attach(name string, pid int) (*Instance, error) {
 	}()
 
 	return &Instance{
-		QMP:    qmpSocketFor(name),
-		QGA:    qgaSocketFor(name),
-		Pid:    pid,
-		Done:   ch,
-		Stderr: errFileFor(name),
-		Stdout: outFileFor(name),
+		QMP:  qmpSocketFor(name),
+		QGA:  qgaSocketFor(name),
+		Pid:  pid,
+		Done: ch,
 	}, nil
 }
 
-func Start(name, url string, redirect bool, config Config) (*Instance, error) {
+func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance, error) {
 	const QEMU = "qemu-system-x86_64"
 	if _, err := exec.LookPath(QEMU); err != nil {
 		return nil, fmt.Errorf("%s is not available; please install %s", QEMU, QEMU)
@@ -106,19 +94,17 @@ func Start(name, url string, redirect bool, config Config) (*Instance, error) {
 	}
 
 	command := exec.Command(QEMU, args...)
-	if redirect {
-		outFile, outFileErr := os.OpenFile(outFileFor(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if outFileErr != nil {
-			return nil, outFileErr
-		}
-		command.Stdout = outFile
-
-		errFile, errFileErr := os.OpenFile(errFileFor(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if errFileErr != nil {
-			return nil, errFileErr
-		}
-		command.Stderr = errFile
+	outFile, outFileErr := os.OpenFile(outFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if outFileErr != nil {
+		return nil, outFileErr
 	}
+	command.Stdout = outFile
+
+	errFile, errFileErr := os.OpenFile(errFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if errFileErr != nil {
+		return nil, errFileErr
+	}
+	command.Stderr = errFile
 
 	// Detach from parent process
 	command.SysProcAttr = &syscall.SysProcAttr{
@@ -145,12 +131,10 @@ func Start(name, url string, redirect bool, config Config) (*Instance, error) {
 	}(name)
 
 	return &Instance{
-		QMP:    qmpSocketFor(name),
-		QGA:    qgaSocketFor(name),
-		Pid:    command.Process.Pid,
-		Done:   ch,
-		Stderr: errFileFor(name),
-		Stdout: outFileFor(name),
+		QMP:  qmpSocketFor(name),
+		QGA:  qgaSocketFor(name),
+		Pid:  command.Process.Pid,
+		Done: ch,
 	}, nil
 }
 
