@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/q-controller/qemu-client/pkg/qemu"
 	"github.com/q-controller/qemu-client/pkg/utils"
@@ -18,7 +20,7 @@ var rootCmd = &cobra.Command{
 			return macErr
 		}
 
-		instance, instanceErr := qemu.Start("example", image, false, qemu.Config{
+		instance, instanceErr := qemu.Start("example", image, "out", "err", qemu.Config{
 			Cpus:   1,
 			Memory: "1G",
 			Disk:   "10G",
@@ -42,6 +44,18 @@ chpasswd:
 		if instanceErr != nil {
 			return instanceErr
 		}
+
+		defer func() {
+			_ = os.Remove("out")
+			_ = os.Remove("err")
+		}()
+
+		go func() {
+			time.Sleep(5 * time.Second) // Wait for the VM to start
+			if stopErr := instance.Stop(); stopErr != nil {
+				fmt.Printf("Error stopping instance: %v\n", stopErr)
+			}
+		}()
 
 		<-instance.Done
 
