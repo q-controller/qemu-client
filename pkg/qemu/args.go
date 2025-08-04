@@ -88,6 +88,12 @@ func Memory(memory string) Option {
 	}
 }
 
+func Cpus(cpus int) Option {
+	return func(config *QemuConfig) {
+		config.Hardware.Cpus = cpus
+	}
+}
+
 func TmpDir(path string) Option {
 	return func(config *QemuConfig) {
 		config.TmpDir = path
@@ -131,6 +137,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 
 	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", qmpSocketFor(config.Id)))
 	args = append(args, "-cpu", "host")
+	args = append(args, "-smp", fmt.Sprintf("%d", config.Hardware.Cpus))
 	args = append(args, "-hda", config.Image)
 	args = append(args, "-device", "virtio-serial")
 	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", qgaSocketFor(config.Id)))
