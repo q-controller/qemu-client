@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log/slog"
 	"os"
 
 	"github.com/q-controller/qemu-client/pkg/qemu"
@@ -19,7 +18,7 @@ var rootCmd = &cobra.Command{
 			return macErr
 		}
 
-		instance, instanceErr := qemu.Start("example", image, qemu.Config{
+		instance, instanceErr := qemu.Start("example", image, false, qemu.Config{
 			Cpus:   1,
 			Memory: "1G",
 			Disk:   "10G",
@@ -44,17 +43,7 @@ chpasswd:
 			return instanceErr
 		}
 
-	channelLoop:
-		for {
-			select {
-			case str := <-instance.Stderr:
-				slog.Error(str)
-			case str := <-instance.Stdout:
-				slog.Info(str)
-			case <-instance.Done:
-				break channelLoop
-			}
-		}
+		<-instance.Done
 
 		return nil
 	},

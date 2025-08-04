@@ -1,12 +1,10 @@
 package qemu
 
 import (
-	"bufio"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 
 	"github.com/q-controller/qemu-client/pkg/utils"
@@ -17,8 +15,8 @@ type Instance struct {
 	QGA    string
 	Pid    int
 	Done   <-chan interface{}
-	Stderr <-chan string
-	Stdout <-chan string
+	Stderr string
+	Stdout string
 }
 
 type Config struct {
@@ -29,6 +27,14 @@ type Config struct {
 	HwAddr   string
 }
 
+func outFileFor(name string) string {
+	return fmt.Sprintf("/tmp/%s.out", name)
+}
+
+func errFileFor(name string) string {
+	return fmt.Sprintf("/tmp/%s.err", name)
+}
+
 func qmpSocketFor(name string) string {
 	return fmt.Sprintf("/tmp/%s.sock", name)
 }
@@ -37,7 +43,7 @@ func qgaSocketFor(name string) string {
 	return fmt.Sprintf("/tmp/qga-%s.sock", name)
 }
 
-func Start(name, url string, config Config) (*Instance, error) {
+func Start(name, url string, redirect bool, config Config) (*Instance, error) {
 	const QEMU = "qemu-system-x86_64"
 	if _, err := exec.LookPath(QEMU); err != nil {
 		return nil, fmt.Errorf("%s is not available; please install %s", QEMU, QEMU)
@@ -68,41 +74,24 @@ func Start(name, url string, config Config) (*Instance, error) {
 	}
 
 	command := exec.Command(QEMU, args...)
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stdout pipe: %w", err)
+	if redirect {
+		outFile, outFileErr := os.OpenFile(outFileFor(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if outFileErr != nil {
+			return nil, outFileErr
+		}
+		command.Stdout = outFile
+
+		errFile, errFileErr := os.OpenFile(errFileFor(name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if errFileErr != nil {
+			return nil, errFileErr
+		}
+		command.Stderr = errFile
 	}
-	stderr, err := command.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stderr pipe: %w", err)
+
+	// Detach from parent process
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
 	}
-
-	errCh := make(chan string)
-	outCh := make(chan string)
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			if text := strings.TrimSpace(scanner.Text()); text != "" {
-				outCh <- text
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			slog.Error("Error reading QEMU stdout", "error", err)
-		}
-	}()
-
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			if text := strings.TrimSpace(scanner.Text()); text != "" {
-				errCh <- text
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			slog.Error("Error reading QEMU stderr", "error", err)
-		}
-	}()
 
 	// Start QEMU non-blocking
 	if err := command.Start(); err != nil {
@@ -115,8 +104,6 @@ func Start(name, url string, config Config) (*Instance, error) {
 	go func(name string) {
 		defer os.RemoveAll(tmpDir)
 		defer close(ch)
-		defer close(outCh)
-		defer close(errCh)
 
 		waitErr := command.Wait()
 		if waitErr != nil {
@@ -130,8 +117,8 @@ func Start(name, url string, config Config) (*Instance, error) {
 		QGA:    qgaSocketFor(name),
 		Pid:    command.Process.Pid,
 		Done:   ch,
-		Stderr: errCh,
-		Stdout: outCh,
+		Stderr: errFileFor(name),
+		Stdout: outFileFor(name),
 	}, nil
 }
 
