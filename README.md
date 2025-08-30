@@ -1,3 +1,5 @@
+![Build](https://github.com/q-controller/qemu-client/actions/workflows/build.yml/badge.svg)
+
 # QEMU client
 
 This project provides a lightweight Go package for interacting with the QEMU command-line tool. It simplifies launching and managing QEMU virtual machines (VMs) by supporting a curated subset of QEMU options, enabling:
