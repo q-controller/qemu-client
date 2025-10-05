@@ -64,9 +64,13 @@ func Attach(name string, pid int) (*Instance, error) {
 }
 
 func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance, error) {
-	const QEMU = "qemu-system-x86_64"
-	if _, err := exec.LookPath(QEMU); err != nil {
-		return nil, fmt.Errorf("%s is not available; please install %s", QEMU, QEMU)
+	qemuBinary, qemuBinaryErr := utils.GetQemuBinary()
+	if qemuBinaryErr != nil {
+		return nil, qemuBinaryErr
+	}
+
+	if _, err := exec.LookPath(qemuBinary); err != nil {
+		return nil, fmt.Errorf("%s is not available; please install %s", qemuBinary, qemuBinary)
 	}
 
 	tmpDir, tmpDirErr := os.MkdirTemp("", "cloudinit-*")
@@ -74,9 +78,19 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 		return nil, tmpDirErr
 	}
 
+	machineType, machineTypeErr := utils.GetMachineType()
+	if machineTypeErr != nil {
+		return nil, machineTypeErr
+	}
+
+	bios, biosErr := utils.GetBios()
+	if biosErr != nil {
+		return nil, biosErr
+	}
+
 	args, argsErr := BuildQemuArgs(
 		Id(name),
-		Machine("q35"),
+		Machine(machineType),
 		Accelerator(utils.GetAccelerator()),
 		Memory(config.Memory),
 		Disk(config.Disk),
@@ -88,12 +102,14 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 		Image(url),
 		Userdata(config.UserData),
 		TmpDir(tmpDir),
+		Bios(bios),
 	)
 	if argsErr != nil {
 		return nil, argsErr
 	}
 
-	command := exec.Command(QEMU, args...)
+	slog.Info("QEMU command", "binary", qemuBinary, "args", args)
+	command := exec.Command(qemuBinary, args...)
 	outFile, outFileErr := os.OpenFile(outFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if outFileErr != nil {
 		return nil, outFileErr

@@ -30,6 +30,7 @@ type QemuConfig struct {
 	Userdata    string
 	Hardware    Hardware
 	TmpDir      string
+	Bios        string
 }
 
 type Option func(*QemuConfig)
@@ -106,6 +107,12 @@ func TmpDir(path string) Option {
 	}
 }
 
+func Bios(bios string) Option {
+	return func(config *QemuConfig) {
+		config.Bios = bios
+	}
+}
+
 func BuildQemuArgs(opts ...Option) ([]string, error) {
 	config := &QemuConfig{
 		Machine: "q35",
@@ -177,6 +184,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 			return nil, cloudInitErr
 		}
 		args = append(args, "-drive", fmt.Sprintf("file=%s,format=raw,if=virtio", cloudInitPath))
+	}
+
+	if config.Bios != "" {
+		args = append(args, "-bios", config.Bios)
 	}
 
 	return args, nil
