@@ -13,7 +13,5 @@ func createCloudInitISOImpl(cloudInitPath, isoPath string) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	cmd.Wait()
-
-	return nil
+	return cmd.Wait()
 }
