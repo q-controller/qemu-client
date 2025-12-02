@@ -135,7 +135,6 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	}
 
 	if info, infoErr := image.Info(); infoErr == nil {
-		fmt.Println(info)
 		if disk, diskErr := utils.ParseMb(config.Hardware.Disk); diskErr == nil {
 			if utils.BytesToMb(info.VirtualSizeBytes) < disk {
 				if resizeErr := image.Resize(utils.MbToBytes(disk)); resizeErr != nil {
@@ -143,8 +142,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 				}
 			}
 		} else {
-			fmt.Println(diskErr)
+			fmt.Println("Failed to parse disk size:", diskErr)
 		}
+	} else {
+		fmt.Println("Failed to get image info:", infoErr)
 	}
 
 	args := []string{}
@@ -178,13 +179,11 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		return nil, tmpDirErr
 	}
 
-	if config.Userdata != "" {
-		cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.Userdata, tmpDir, uuid.New().String())
-		if cloudInitErr != nil {
-			return nil, cloudInitErr
-		}
-		args = append(args, "-drive", fmt.Sprintf("file=%s,format=raw,if=virtio", cloudInitPath))
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.Userdata, tmpDir, uuid.New().String())
+	if cloudInitErr != nil {
+		return nil, cloudInitErr
 	}
+	args = append(args, "-drive", fmt.Sprintf("file=%s,format=raw,if=virtio", cloudInitPath))
 
 	if config.Bios != "" {
 		args = append(args, "-bios", config.Bios)
