@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -53,7 +53,7 @@ chpasswd:
 		go func() {
 			time.Sleep(5 * time.Second) // Wait for the VM to start
 			if stopErr := instance.Stop(); stopErr != nil {
-				fmt.Printf("Error stopping instance: %v\n", stopErr)
+				slog.Error("Error stopping instance", "error", stopErr)
 			}
 		}()
 
