@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ func CreateCloudInitISO(userData, dir, instanceID string) (string, error) {
 	userDataPath := filepath.Join(dir, "user-data")
 	mergedUserData, mergeErr := mergeCloudConfig(userData)
 	if mergeErr != nil {
-		fmt.Printf("Failed to merge cloud-init config: %v.\nUsing the original userdata.\n", mergeErr)
+		slog.Error("Failed to merge cloud-init config.Using the original userdata", "error", mergeErr)
 		mergedUserData = userData
 	}
 

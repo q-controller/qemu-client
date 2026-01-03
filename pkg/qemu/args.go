@@ -2,6 +2,7 @@ package qemu
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
@@ -142,10 +143,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 				}
 			}
 		} else {
-			fmt.Println("Failed to parse disk size:", diskErr)
+			slog.Error("Failed to parse disk size", "error", diskErr)
 		}
 	} else {
-		fmt.Println("Failed to get image info:", infoErr)
+		slog.Error("Failed to get image info", "error", infoErr)
 	}
 
 	args := []string{}
