@@ -15,8 +15,8 @@ type NetworkConfig struct {
 }
 
 type Hardware struct {
-	Memory string
-	Disk   string
+	Memory uint32 // in MB
+	Disk   uint32 // in MB
 	Cpus   int
 }
 
@@ -84,13 +84,13 @@ func Userdata(userdata string) Option {
 	}
 }
 
-func Memory(memory string) Option {
+func Memory(memory uint32) Option {
 	return func(config *QemuConfig) {
 		config.Hardware.Memory = memory
 	}
 }
 
-func Disk(disk string) Option {
+func Disk(disk uint32) Option {
 	return func(config *QemuConfig) {
 		config.Hardware.Disk = disk
 	}
@@ -121,8 +121,8 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 			Driver: "virtio-net",
 		},
 		Hardware: Hardware{
-			Memory: "1G",
-			Disk:   "40G",
+			Memory: 1024,      // 1 GB
+			Disk:   40 * 1024, // 40 GB
 			Cpus:   1,
 		},
 	}
@@ -136,14 +136,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	}
 
 	if info, infoErr := image.Info(); infoErr == nil {
-		if disk, diskErr := utils.ParseMb(config.Hardware.Disk); diskErr == nil {
-			if utils.BytesToMb(info.VirtualSizeBytes) < disk {
-				if resizeErr := image.Resize(utils.MbToBytes(disk)); resizeErr != nil {
-					return nil, resizeErr
-				}
+		if utils.BytesToMb(info.VirtualSizeBytes) < uint64(config.Hardware.Disk) {
+			if resizeErr := image.Resize(utils.MbToBytes(uint64(config.Hardware.Disk))); resizeErr != nil {
+				return nil, resizeErr
 			}
-		} else {
-			slog.Error("Failed to parse disk size", "error", diskErr)
 		}
 	} else {
 		slog.Error("Failed to get image info", "error", infoErr)
@@ -151,14 +147,9 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 
 	args := []string{}
 
-	memoryMb, memoryErr := utils.ParseMb(config.Hardware.Memory)
-	if memoryErr != nil {
-		return nil, memoryErr
-	}
-
 	args = append(args, "-machine", config.Machine)
 	args = append(args, "-accel", config.Accelerator)
-	args = append(args, "-m", fmt.Sprintf("%d", int(memoryMb)))
+	args = append(args, "-m", utils.FormatMb(config.Hardware.Memory))
 	args = append(args, "-nographic")
 
 	netArgs, netArgsErr := build_network(config.Id, config.Network)

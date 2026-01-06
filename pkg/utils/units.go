@@ -17,21 +17,21 @@ func ParseMb(sizeStr string) (uint64, error) {
 	return BytesToMb(bytes), nil
 }
 
-// Convert bytes to megabytes (1 MB = 1024 * 1024 bytes)
+// Convert bytes to megabytes
 func BytesToMb(bytes uint64) uint64 {
-	megabytes := float64(bytes) / (1024 * 1024)
-	return uint64(math.Ceil(megabytes/10) * 10)
+	megabytes := float64(bytes) / humanize.MiByte
+	return uint64(math.Ceil(megabytes))
 }
 
 func MbToBytes(mb uint64) uint64 {
-	return mb * (1024 * 1024)
+	return mb * humanize.MiByte
 }
 
 func FormatMb(megabytes uint32) string {
-	// Convert megabytes to bytes (1 MB = 1024 * 1024 bytes)
-	bytes := uint64(megabytes * 1024 * 1024)
+	return fmt.Sprintf("%dM", megabytes)
+}
 
-	// Format bytes into a human-readable string
-	humanReadable := humanize.Bytes(bytes)
+func FormatBytes(bytes uint64) string {
+	humanReadable := humanize.SI(float64(bytes), "B")
 	return humanReadable
 }

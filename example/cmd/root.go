@@ -22,8 +22,8 @@ var rootCmd = &cobra.Command{
 
 		instance, instanceErr := qemu.Start("example", image, "out", "err", qemu.Config{
 			Cpus:   1,
-			Memory: "1G",
-			Disk:   "10G",
+			Memory: 1024,      // 1 GB
+			Disk:   40 * 1024, // 40 GB
 			HwAddr: mac,
 			UserData: `#cloud-config
 ssh_pwauth: true

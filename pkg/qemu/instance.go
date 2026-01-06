@@ -20,8 +20,8 @@ type Instance struct {
 
 type Config struct {
 	Cpus     uint32
-	Memory   string
-	Disk     string
+	Memory   uint32 // in MB
+	Disk     uint32 // in MB
 	UserData string
 	HwAddr   string
 }
