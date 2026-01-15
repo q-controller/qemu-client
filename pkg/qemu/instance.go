@@ -52,7 +52,8 @@ func Attach(name string, pid int) (*Instance, error) {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		ch <- true
+		os.Remove(qmpSocketFor(name))
+		os.Remove(qgaSocketFor(name))
 	}()
 
 	return &Instance{
