@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/q-controller/qemu-client/pkg/utils"
 )
 
@@ -171,7 +170,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		return nil, tmpDirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.Userdata, tmpDir, uuid.New().String())
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.Userdata, tmpDir, config.Id)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
