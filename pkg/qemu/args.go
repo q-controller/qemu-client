@@ -157,12 +157,12 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	}
 	args = append(args, netArgs...)
 
-	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", qmpSocketFor(config.Id)))
+	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", config.Qmp))
 	args = append(args, "-cpu", "host")
 	args = append(args, "-smp", fmt.Sprintf("%d", config.Hardware.Cpus))
 	args = append(args, "-hda", config.Image)
 	args = append(args, "-device", "virtio-serial")
-	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", qgaSocketFor(config.Id)))
+	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", config.Qga))
 	args = append(args, "-device", "virtserialport,chardev=charchannel0,name=org.qemu.guest_agent.0")
 
 	tmpDir, tmpDirErr := os.MkdirTemp("", "cloudinit-*")
