@@ -25,7 +25,8 @@ var rootCmd = &cobra.Command{
 			Memory: 1024,      // 1 GB
 			Disk:   40 * 1024, // 40 GB
 			HwAddr: mac,
-			UserData: `#cloud-config
+			CloudInit: qemu.CloudInitConfig{
+				Userdata: `#cloud-config
 ssh_pwauth: true
 users:
   - name: exampleuser
@@ -39,6 +40,8 @@ chpasswd:
     exampleuser:examplepass
   expire: false
 `,
+				NetworkConfig: "",
+			},
 		})
 
 		if instanceErr != nil {

@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func CreateCloudInitISO(userData, dir, instanceID string) (string, error) {
+func CreateCloudInitISO(userData, networkConfig, dir, instanceID string) (string, error) {
 	userDataPath := filepath.Join(dir, "user-data")
 	mergedUserData, mergeErr := mergeCloudConfig(userData)
 	if mergeErr != nil {
@@ -27,6 +27,11 @@ local-hostname: %s
 `, instanceID, instanceID)
 	metaDataPath := filepath.Join(dir, "meta-data")
 	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+		return "", fmt.Errorf("failed to write meta-data: %v", err)
+	}
+
+	networkConfigPath := filepath.Join(dir, "network-config")
+	if err := os.WriteFile(networkConfigPath, []byte(networkConfig), 0644); err != nil {
 		return "", fmt.Errorf("failed to write meta-data: %v", err)
 	}
 

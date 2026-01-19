@@ -19,6 +19,11 @@ type Hardware struct {
 	Cpus   int
 }
 
+type CloudInitConfig struct {
+	Userdata      string
+	NetworkConfig string
+}
+
 type QemuConfig struct {
 	Id          string
 	Machine     string
@@ -27,7 +32,7 @@ type QemuConfig struct {
 	Qmp         string
 	Qga         string
 	Image       string
-	Userdata    string
+	CloudInit   CloudInitConfig
 	Hardware    Hardware
 	TmpDir      string
 	Bios        string
@@ -77,9 +82,9 @@ func Image(path string) Option {
 	}
 }
 
-func Userdata(userdata string) Option {
+func CloudInit(cloudinit CloudInitConfig) Option {
 	return func(config *QemuConfig) {
-		config.Userdata = userdata
+		config.CloudInit = cloudinit
 	}
 }
 
@@ -170,7 +175,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		return nil, tmpDirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.Userdata, tmpDir, config.Id)
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, tmpDir, config.Id)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}

@@ -19,11 +19,11 @@ type Instance struct {
 }
 
 type Config struct {
-	Cpus     uint32
-	Memory   uint32 // in MB
-	Disk     uint32 // in MB
-	UserData string
-	HwAddr   string
+	Cpus      uint32
+	Memory    uint32 // in MB
+	Disk      uint32 // in MB
+	HwAddr    string
+	CloudInit CloudInitConfig
 }
 
 func qmpSocketFor(name string) string {
@@ -101,7 +101,7 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 			Driver: "virtio-net",
 		}),
 		Image(url),
-		Userdata(config.UserData),
+		CloudInit(config.CloudInit),
 		TmpDir(tmpDir),
 		Bios(bios),
 		Qmp(qmpSocketFor(name)),
