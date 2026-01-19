@@ -104,6 +104,8 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 		Userdata(config.UserData),
 		TmpDir(tmpDir),
 		Bios(bios),
+		Qmp(qmpSocketFor(name)),
+		Qga(qgaSocketFor(name)),
 	)
 	if argsErr != nil {
 		return nil, argsErr
