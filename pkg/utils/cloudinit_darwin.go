@@ -1,8 +1,8 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 )
 
@@ -11,10 +11,10 @@ func createCloudInitISOImpl(cloudInitPath, isoPath string) error {
 		fmt.Sprintf("%s/user-data", cloudInitPath),
 		fmt.Sprintf("%s/meta-data", cloudInitPath),
 		fmt.Sprintf("%s/network-config", cloudInitPath))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mkisofs failed: %w: %s", err, stderr.String())
 	}
-	return cmd.Wait()
+	return nil
 }
