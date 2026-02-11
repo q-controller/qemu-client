@@ -20,11 +20,17 @@ var rootCmd = &cobra.Command{
 			return macErr
 		}
 
+		platformConfig, platformErr := getPlatformConfig()
+		if platformErr != nil {
+			return platformErr
+		}
+
 		instance, instanceErr := qemu.Start("example", image, "out", "err", qemu.Config{
-			Cpus:   1,
-			Memory: 1024,      // 1 GB
-			Disk:   40 * 1024, // 40 GB
-			HwAddr: mac,
+			Cpus:     1,
+			Memory:   1024,      // 1 GB
+			Disk:     40 * 1024, // 40 GB
+			HwAddr:   mac,
+			Platform: platformConfig,
 			CloudInit: qemu.CloudInitConfig{
 				Userdata: `#cloud-config
 ssh_pwauth: true

@@ -29,6 +29,7 @@ type QemuConfig struct {
 	Machine     string
 	Accelerator string
 	Network     NetworkConfig
+	Platform    *PlatformConfig
 	Qmp         string
 	Qga         string
 	Image       string
@@ -61,6 +62,12 @@ func Accelerator(accel string) Option {
 func Network(network NetworkConfig) Option {
 	return func(config *QemuConfig) {
 		config.Network = network
+	}
+}
+
+func Platform(platform *PlatformConfig) Option {
+	return func(config *QemuConfig) {
+		config.Platform = platform
 	}
 }
 
@@ -156,7 +163,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	args = append(args, "-m", utils.FormatMb(config.Hardware.Memory))
 	args = append(args, "-nographic")
 
-	netArgs, netArgsErr := build_network(config.Id, config.Network)
+	netArgs, netArgsErr := buildNetwork(config.Id, config.Network, config.Platform)
 	if netArgsErr != nil {
 		return nil, netArgsErr
 	}

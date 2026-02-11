@@ -23,6 +23,7 @@ type Config struct {
 	Memory    uint32 // in MB
 	Disk      uint32 // in MB
 	HwAddr    string
+	Platform  *PlatformConfig // platform-specific configuration
 	CloudInit CloudInitConfig
 }
 
@@ -100,6 +101,7 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 			Mac:    config.HwAddr,
 			Driver: "virtio-net",
 		}),
+		Platform(config.Platform),
 		Image(url),
 		CloudInit(config.CloudInit),
 		TmpDir(tmpDir),
