@@ -2,36 +2,36 @@ package qemu
 
 import (
 	"fmt"
-	"os/exec"
-	"strings"
 )
 
-func getDefaultInterface() (string, error) {
-	out, err := exec.Command("route", "get", "default").Output()
-	if err != nil {
-		return "", err
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "interface:") {
-			fields := strings.Fields(line)
-			if len(fields) == 2 {
-				return strings.TrimSpace(fields[1]), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("default interface not found")
-}
-
-func build_network(id string, network NetworkConfig) ([]string, error) {
-	ifc, ifcErr := getDefaultInterface()
-	if ifcErr != nil {
-		return nil, ifcErr
+func buildNetwork(id string, network NetworkConfig, platform *PlatformConfig) ([]string, error) {
+	if platform == nil || platform.Network == nil {
+		return nil, fmt.Errorf("platform network configuration required")
 	}
 
-	args := []string{}
+	darwinNet := platform.Network
+	if darwinNet.Bridged != nil && darwinNet.Shared != nil {
+		return nil, fmt.Errorf("network configuration: Bridged and Shared are mutually exclusive")
+	}
 
-	args = append(args, "-device", fmt.Sprintf("%s,netdev=%s,mac=%s", network.Driver, id, network.Mac))
-	args = append(args, "-netdev", fmt.Sprintf("vmnet-bridged,id=%s,ifname=%s", id, ifc))
+	var netdevArgs string
+	var netdevArgsErr error
+
+	if darwinNet.Bridged != nil {
+		netdevArgs, netdevArgsErr = darwinNet.Bridged.buildNetdevArgs(id)
+	} else if darwinNet.Shared != nil {
+		netdevArgs, netdevArgsErr = darwinNet.Shared.buildNetdevArgs(id)
+	} else {
+		return nil, fmt.Errorf("network configuration required: either Bridged or Shared must be set")
+	}
+	if netdevArgsErr != nil {
+		return nil, netdevArgsErr
+	}
+
+	args := []string{
+		"-netdev", netdevArgs,
+		"-device", fmt.Sprintf("%s,netdev=%s,mac=%s,id=%s", network.Driver, id, network.Mac, id),
+	}
 
 	return args, nil
 }

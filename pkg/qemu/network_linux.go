@@ -2,11 +2,11 @@ package qemu
 
 import "fmt"
 
-func build_network(id string, network NetworkConfig) ([]string, error) {
+func buildNetwork(id string, network NetworkConfig, platform *PlatformConfig) ([]string, error) {
 	args := []string{}
 
-	args = append(args, "-device", fmt.Sprintf("%s,netdev=net0,mac=%s,id=%s", network.Driver, network.Mac, id))
-	args = append(args, "-netdev", fmt.Sprintf("tap,id=net0,ifname=%s,script=no,downscript=no", id))
+	args = append(args, "-device", fmt.Sprintf("%s,netdev=%s,mac=%s,id=%s", network.Driver, id, network.Mac, id))
+	args = append(args, "-netdev", fmt.Sprintf("tap,id=%s,ifname=%s,script=no,downscript=no", id, id))
 
 	return args, nil
 }
