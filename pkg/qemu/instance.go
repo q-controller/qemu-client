@@ -111,6 +111,12 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 		return nil, argsErr
 	}
 
+	// Remove stale socket files from a previous run before starting QEMU.
+	// QEMU creates these as server sockets; if stale files remain, the new
+	// instance may fail to bind or clients may get "connection refused".
+	os.Remove(qmpSocketFor(name))
+	os.Remove(qgaSocketFor(name))
+
 	slog.Info("QEMU command", "binary", qemuBinary, "args", args)
 	command := exec.Command(qemuBinary, args...)
 	outFile, outFileErr := os.OpenFile(outFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -146,6 +152,8 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 		if waitErr != nil {
 			slog.Info("Exited with error", "error", waitErr)
 		}
+		os.Remove(qmpSocketFor(name))
+		os.Remove(qgaSocketFor(name))
 		ch <- true
 	}(name)
 
