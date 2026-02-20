@@ -192,5 +192,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		args = append(args, "-bios", config.Bios)
 	}
 
+	args = append(args, "-device", fmt.Sprintf("virtio-balloon,id=balloon-%s,guest-stats-polling-interval=2", config.Id))
+
 	return args, nil
 }
