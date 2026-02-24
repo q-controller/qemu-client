@@ -5,6 +5,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,15 +30,57 @@ type Config struct {
 	CloudInit CloudInitConfig
 }
 
-func qmpSocketFor(name string) string {
-	return fmt.Sprintf("/tmp/%s.sock", name)
+// Path helpers — all runtime files live inside the instance directory.
+
+func QmpSocketPath(dir string) string {
+	return filepath.Join(dir, "qmp.sock")
 }
 
-func qgaSocketFor(name string) string {
-	return fmt.Sprintf("/tmp/qga-%s.sock", name)
+func QgaSocketPath(dir string) string {
+	return filepath.Join(dir, "qga.sock")
 }
 
-func Attach(name string, pid int) (*Instance, error) {
+func PidfilePath(dir string) string {
+	return filepath.Join(dir, "pid")
+}
+
+func StdoutPath(dir string) string {
+	return filepath.Join(dir, "stdout")
+}
+
+func StderrPath(dir string) string {
+	return filepath.Join(dir, "stderr")
+}
+
+func ImagePath(dir string) string {
+	return filepath.Join(dir, "image")
+}
+
+func CloudInitPath(dir string) string {
+	return filepath.Join(dir, "cloudinit")
+}
+
+func ReadPidfile(dir string) (int, error) {
+	data, err := os.ReadFile(PidfilePath(dir))
+	if err != nil {
+		return 0, err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, fmt.Errorf("invalid pidfile content: %w", err)
+	}
+	return pid, nil
+}
+
+func ProcessAlive(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+func Attach(name, dir string, pid int) (*Instance, error) {
 	proc, procErr := os.FindProcess(pid)
 	if procErr != nil {
 		return nil, procErr
@@ -53,19 +98,17 @@ func Attach(name string, pid int) (*Instance, error) {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		os.Remove(qmpSocketFor(name))
-		os.Remove(qgaSocketFor(name))
 	}()
 
 	return &Instance{
-		QMP:  qmpSocketFor(name),
-		QGA:  qgaSocketFor(name),
+		QMP:  QmpSocketPath(dir),
+		QGA:  QgaSocketPath(dir),
 		Pid:  pid,
 		Done: ch,
 	}, nil
 }
 
-func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance, error) {
+func Start(name, dir string, config Config) (*Instance, error) {
 	qemuBinary, qemuBinaryErr := utils.GetQemuBinary()
 	if qemuBinaryErr != nil {
 		return nil, qemuBinaryErr
@@ -73,11 +116,6 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 
 	if _, err := exec.LookPath(qemuBinary); err != nil {
 		return nil, fmt.Errorf("%s is not available; please install %s", qemuBinary, qemuBinary)
-	}
-
-	tmpDir, tmpDirErr := os.MkdirTemp("", "cloudinit-*")
-	if tmpDirErr != nil {
-		return nil, tmpDirErr
 	}
 
 	machineType, machineTypeErr := utils.GetMachineType()
@@ -102,32 +140,28 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 			Driver: "virtio-net",
 		}),
 		Platform(config.Platform),
-		Image(url),
+		Dir(dir),
 		CloudInit(config.CloudInit),
-		TmpDir(tmpDir),
 		Bios(bios),
-		Qmp(qmpSocketFor(name)),
-		Qga(qgaSocketFor(name)),
 	)
 	if argsErr != nil {
 		return nil, argsErr
 	}
 
 	// Remove stale socket files from a previous run before starting QEMU.
-	// QEMU creates these as server sockets; if stale files remain, the new
-	// instance may fail to bind or clients may get "connection refused".
-	os.Remove(qmpSocketFor(name))
-	os.Remove(qgaSocketFor(name))
+	os.Remove(QmpSocketPath(dir))
+	os.Remove(QgaSocketPath(dir))
 
 	slog.Info("QEMU command", "binary", qemuBinary, "args", args)
 	command := exec.Command(qemuBinary, args...)
-	outFile, outFileErr := os.OpenFile(outFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+
+	outFile, outFileErr := os.OpenFile(StdoutPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if outFileErr != nil {
 		return nil, outFileErr
 	}
 	command.Stdout = outFile
 
-	errFile, errFileErr := os.OpenFile(errFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	errFile, errFileErr := os.OpenFile(StderrPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if errFileErr != nil {
 		return nil, errFileErr
 	}
@@ -146,22 +180,19 @@ func Start(name, url, outFilePath, errFilePath string, config Config) (*Instance
 
 	ch := make(chan interface{})
 
-	go func(name string) {
-		defer os.RemoveAll(tmpDir)
+	go func() {
 		defer close(ch)
 
 		waitErr := command.Wait()
 		if waitErr != nil {
 			slog.Info("Exited with error", "error", waitErr)
 		}
-		os.Remove(qmpSocketFor(name))
-		os.Remove(qgaSocketFor(name))
 		ch <- true
-	}(name)
+	}()
 
 	return &Instance{
-		QMP:  qmpSocketFor(name),
-		QGA:  qgaSocketFor(name),
+		QMP:  QmpSocketPath(dir),
+		QGA:  QgaSocketPath(dir),
 		Pid:  command.Process.Pid,
 		Done: ch,
 	}, nil

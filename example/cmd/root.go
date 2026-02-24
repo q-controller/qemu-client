@@ -25,7 +25,19 @@ var rootCmd = &cobra.Command{
 			return platformErr
 		}
 
-		instance, instanceErr := qemu.Start("example", image, "out", "err", qemu.Config{
+		// Create instance directory with image
+		dir, dirErr := os.MkdirTemp("", "qemu-example-*")
+		if dirErr != nil {
+			return dirErr
+		}
+		defer os.RemoveAll(dir)
+
+		// Copy/link image into instance dir
+		if linkErr := os.Symlink(image, qemu.ImagePath(dir)); linkErr != nil {
+			return linkErr
+		}
+
+		instance, instanceErr := qemu.Start("example", dir, qemu.Config{
 			Cpus:     1,
 			Memory:   1024,      // 1 GB
 			Disk:     40 * 1024, // 40 GB
@@ -53,11 +65,6 @@ chpasswd:
 		if instanceErr != nil {
 			return instanceErr
 		}
-
-		defer func() {
-			_ = os.Remove("out")
-			_ = os.Remove("err")
-		}()
 
 		go func() {
 			time.Sleep(5 * time.Second) // Wait for the VM to start

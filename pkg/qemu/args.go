@@ -30,12 +30,9 @@ type QemuConfig struct {
 	Accelerator string
 	Network     NetworkConfig
 	Platform    *PlatformConfig
-	Qmp         string
-	Qga         string
-	Image       string
+	Dir         string // instance directory — all runtime paths derived from this
 	CloudInit   CloudInitConfig
 	Hardware    Hardware
-	TmpDir      string
 	Bios        string
 }
 
@@ -71,21 +68,9 @@ func Platform(platform *PlatformConfig) Option {
 	}
 }
 
-func Qmp(path string) Option {
+func Dir(path string) Option {
 	return func(config *QemuConfig) {
-		config.Qmp = path
-	}
-}
-
-func Qga(path string) Option {
-	return func(config *QemuConfig) {
-		config.Qga = path
-	}
-}
-
-func Image(path string) Option {
-	return func(config *QemuConfig) {
-		config.Image = path
+		config.Dir = path
 	}
 }
 
@@ -113,12 +98,6 @@ func Cpus(cpus int) Option {
 	}
 }
 
-func TmpDir(path string) Option {
-	return func(config *QemuConfig) {
-		config.TmpDir = path
-	}
-}
-
 func Bios(bios string) Option {
 	return func(config *QemuConfig) {
 		config.Bios = bios
@@ -142,8 +121,13 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		opt(config)
 	}
 
+	imagePath := ImagePath(config.Dir)
+	qmpPath := QmpSocketPath(config.Dir)
+	qgaPath := QgaSocketPath(config.Dir)
+	pidfilePath := PidfilePath(config.Dir)
+
 	image := utils.Image{
-		Path: config.Image,
+		Path: imagePath,
 	}
 
 	if info, infoErr := image.Info(); infoErr == nil {
@@ -169,20 +153,21 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	}
 	args = append(args, netArgs...)
 
-	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", config.Qmp))
+	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", qmpPath))
 	args = append(args, "-cpu", "host")
 	args = append(args, "-smp", fmt.Sprintf("%d", config.Hardware.Cpus))
-	args = append(args, "-hda", config.Image)
+	args = append(args, "-hda", imagePath)
+	args = append(args, "-pidfile", pidfilePath)
 	args = append(args, "-device", "virtio-serial")
-	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", config.Qga))
+	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", qgaPath))
 	args = append(args, "-device", "virtserialport,chardev=charchannel0,name=org.qemu.guest_agent.0")
 
-	tmpDir, tmpDirErr := os.MkdirTemp("", "cloudinit-*")
-	if tmpDirErr != nil {
-		return nil, tmpDirErr
+	cloudInitDir := CloudInitPath(config.Dir)
+	if mkdirErr := os.MkdirAll(cloudInitDir, 0755); mkdirErr != nil {
+		return nil, mkdirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, tmpDir, config.Id)
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.Id)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
