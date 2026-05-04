@@ -129,7 +129,7 @@ func Start(name, dir string, config Config) (*Instance, error) {
 	}
 
 	args, argsErr := BuildQemuArgs(
-		Id(name),
+		ID(name),
 		Machine(machineType),
 		Accelerator(utils.GetAccelerator()),
 		Memory(config.Memory),
@@ -149,19 +149,19 @@ func Start(name, dir string, config Config) (*Instance, error) {
 	}
 
 	// Remove stale socket files from a previous run before starting QEMU.
-	os.Remove(QmpSocketPath(dir))
-	os.Remove(QgaSocketPath(dir))
+	_ = os.Remove(QmpSocketPath(dir))
+	_ = os.Remove(QgaSocketPath(dir))
 
 	slog.Info("QEMU command", "binary", qemuBinary, "args", args)
-	command := exec.Command(qemuBinary, args...)
+	command := exec.Command(qemuBinary, args...) //nolint:gosec // G204: spawning qemu with caller-built args is the purpose of this package
 
-	outFile, outFileErr := os.OpenFile(StdoutPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	outFile, outFileErr := os.OpenFile(StdoutPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if outFileErr != nil {
 		return nil, outFileErr
 	}
 	command.Stdout = outFile
 
-	errFile, errFileErr := os.OpenFile(StderrPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	errFile, errFileErr := os.OpenFile(StderrPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if errFileErr != nil {
 		return nil, errFileErr
 	}

@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 )
 
 const (
-	qemu_img = "qemu-img"
+	qemuImg = "qemu-img"
 )
 
 type Info struct {
@@ -20,11 +21,11 @@ type Image struct {
 }
 
 func (i *Image) Info() (*Info, error) {
-	if _, err := exec.LookPath(qemu_img); err != nil {
-		return nil, fmt.Errorf("%s is not available; please install %s", qemu_img, qemu_img)
+	if _, err := exec.LookPath(qemuImg); err != nil {
+		return nil, fmt.Errorf("%s is not available; please install %s", qemuImg, qemuImg)
 	}
 
-	command := exec.Command(qemu_img, "info", "--output=json", i.Path)
+	command := exec.Command(qemuImg, "info", "--output=json", i.Path) //nolint:gosec // G204: i.Path is a caller-controlled image path
 	bytes, bytesErr := command.Output()
 	if bytesErr != nil {
 		return nil, bytesErr
@@ -39,11 +40,11 @@ func (i *Image) Info() (*Info, error) {
 }
 
 func (i *Image) Resize(bytes uint64) error {
-	if _, err := exec.LookPath(qemu_img); err != nil {
-		return fmt.Errorf("%s is not available; please install %s", qemu_img, qemu_img)
+	if _, err := exec.LookPath(qemuImg); err != nil {
+		return fmt.Errorf("%s is not available; please install %s", qemuImg, qemuImg)
 	}
 
-	command := exec.Command(qemu_img, "resize", i.Path, fmt.Sprintf("%d", bytes))
+	command := exec.Command(qemuImg, "resize", i.Path, strconv.FormatUint(bytes, 10)) //nolint:gosec // G204: i.Path is a caller-controlled image path
 	_, outErr := command.Output()
 	if outErr != nil {
 		return outErr

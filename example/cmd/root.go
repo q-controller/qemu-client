@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -30,7 +31,7 @@ var rootCmd = &cobra.Command{
 		if dirErr != nil {
 			return dirErr
 		}
-		defer os.RemoveAll(dir)
+		defer func() { _ = os.RemoveAll(dir) }()
 
 		// Copy/link image into instance dir
 		if linkErr := os.Symlink(image, qemu.ImagePath(dir)); linkErr != nil {
@@ -88,5 +89,7 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().StringVar(&image, "image", "", "Path to the raw image")
-	rootCmd.MarkFlagRequired("image")
+	if err := rootCmd.MarkFlagRequired("image"); err != nil {
+		panic(fmt.Errorf("failed to mark flag `image` as required: %w", err))
+	}
 }

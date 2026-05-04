@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/q-controller/qemu-client/pkg/utils"
 )
@@ -25,7 +26,7 @@ type CloudInitConfig struct {
 }
 
 type QemuConfig struct {
-	Id          string
+	ID          string
 	Machine     string
 	Accelerator string
 	Network     NetworkConfig
@@ -38,9 +39,9 @@ type QemuConfig struct {
 
 type Option func(*QemuConfig)
 
-func Id(id string) Option {
+func ID(id string) Option {
 	return func(config *QemuConfig) {
-		config.Id = id
+		config.ID = id
 	}
 }
 
@@ -147,7 +148,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	args = append(args, "-m", utils.FormatMb(config.Hardware.Memory))
 	args = append(args, "-nographic")
 
-	netArgs, netArgsErr := buildNetwork(config.Id, config.Network, config.Platform)
+	netArgs, netArgsErr := buildNetwork(config.ID, config.Network, config.Platform)
 	if netArgsErr != nil {
 		return nil, netArgsErr
 	}
@@ -155,7 +156,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 
 	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", qmpPath))
 	args = append(args, "-cpu", "host")
-	args = append(args, "-smp", fmt.Sprintf("%d", config.Hardware.Cpus))
+	args = append(args, "-smp", strconv.Itoa(config.Hardware.Cpus))
 	args = append(args, "-hda", imagePath)
 	args = append(args, "-pidfile", pidfilePath)
 	args = append(args, "-device", "virtio-serial")
@@ -163,11 +164,11 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	args = append(args, "-device", "virtserialport,chardev=charchannel0,name=org.qemu.guest_agent.0")
 
 	cloudInitDir := CloudInitPath(config.Dir)
-	if mkdirErr := os.MkdirAll(cloudInitDir, 0755); mkdirErr != nil {
+	if mkdirErr := os.MkdirAll(cloudInitDir, 0750); mkdirErr != nil {
 		return nil, mkdirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.Id)
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.ID)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
@@ -177,7 +178,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		args = append(args, "-bios", config.Bios)
 	}
 
-	args = append(args, "-device", fmt.Sprintf("virtio-balloon,id=balloon-%s,guest-stats-polling-interval=2", config.Id))
+	args = append(args, "-device", fmt.Sprintf("virtio-balloon,id=balloon-%s,guest-stats-polling-interval=2", config.ID))
 
 	return args, nil
 }

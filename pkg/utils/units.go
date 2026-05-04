@@ -11,7 +11,7 @@ func ParseMb(sizeStr string) (uint64, error) {
 	// Parse the string into bytes
 	bytes, err := humanize.ParseBytes(sizeStr)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse size: %v", err)
+		return 0, fmt.Errorf("failed to parse size: %w", err)
 	}
 
 	return BytesToMb(bytes), nil

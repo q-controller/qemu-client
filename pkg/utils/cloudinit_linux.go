@@ -7,7 +7,8 @@ import (
 )
 
 func createCloudInitISOImpl(cloudInitPath, isoPath string) error {
-	cmd := exec.Command("genisoimage", "-output", isoPath, "-V", "cidata", "-r", "-J", fmt.Sprintf("%s/user-data", cloudInitPath), fmt.Sprintf("%s/meta-data", cloudInitPath), fmt.Sprintf("%s/network-config", cloudInitPath))
+	//nolint:gosec // G204: building cloud-init ISO from caller-controlled paths
+	cmd := exec.Command("genisoimage", "-output", isoPath, "-V", "cidata", "-r", "-J", cloudInitPath+"/user-data", cloudInitPath+"/meta-data", cloudInitPath+"/network-config")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
