@@ -1,17 +1,18 @@
 package qemu
 
 import (
+	"errors"
 	"fmt"
 )
 
 func buildNetwork(id string, network NetworkConfig, platform *PlatformConfig) ([]string, error) {
 	if platform == nil || platform.Network == nil {
-		return nil, fmt.Errorf("platform network configuration required")
+		return nil, errors.New("platform network configuration required")
 	}
 
 	darwinNet := platform.Network
 	if darwinNet.Bridged != nil && darwinNet.Shared != nil {
-		return nil, fmt.Errorf("network configuration: Bridged and Shared are mutually exclusive")
+		return nil, errors.New("network configuration: Bridged and Shared are mutually exclusive")
 	}
 
 	var netdevArgs string
@@ -22,7 +23,7 @@ func buildNetwork(id string, network NetworkConfig, platform *PlatformConfig) ([
 	} else if darwinNet.Shared != nil {
 		netdevArgs, netdevArgsErr = darwinNet.Shared.buildNetdevArgs(id)
 	} else {
-		return nil, fmt.Errorf("network configuration required: either Bridged or Shared must be set")
+		return nil, errors.New("network configuration required: either Bridged or Shared must be set")
 	}
 	if netdevArgsErr != nil {
 		return nil, netdevArgsErr

@@ -2,7 +2,10 @@
 
 package qemu
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // VmnetBridged holds configuration for vmnet-bridged networking mode.
 type VmnetBridged struct {
@@ -12,7 +15,7 @@ type VmnetBridged struct {
 // buildNetdevArgs returns the QEMU netdev arguments for bridged mode.
 func (b *VmnetBridged) buildNetdevArgs(id string) (string, error) {
 	if b.Interface == "" {
-		return "", fmt.Errorf("vmnet-bridged: Interface must be set")
+		return "", errors.New("vmnet-bridged: Interface must be set")
 	}
 	return fmt.Sprintf("vmnet-bridged,id=%s,ifname=%s", id, b.Interface), nil
 }
@@ -39,12 +42,12 @@ func (s *VmnetShared) buildNetdevArgs(id string) (string, error) {
 
 	switch setCount {
 	case 0:
-		return fmt.Sprintf("vmnet-shared,id=%s", id), nil
+		return "vmnet-shared,id=" + id, nil
 	case len(fields):
 		return fmt.Sprintf("vmnet-shared,id=%s,start-address=%s,end-address=%s,subnet-mask=%s",
 			id, s.StartAddress, s.EndAddress, s.SubnetMask), nil
 	default:
-		return "", fmt.Errorf("vmnet-shared: all of StartAddress, EndAddress, and SubnetMask must be set together or all left empty")
+		return "", errors.New("vmnet-shared: all of StartAddress, EndAddress, and SubnetMask must be set together or all left empty")
 	}
 }
 

@@ -18,21 +18,21 @@ func CreateCloudInitISO(userData, networkConfig, dir, instanceID string) (string
 		mergedUserData = userData
 	}
 
-	if err := os.WriteFile(userDataPath, []byte(mergedUserData), 0644); err != nil {
-		return "", fmt.Errorf("failed to write user-data: %v", err)
+	if err := os.WriteFile(userDataPath, []byte(mergedUserData), 0600); err != nil {
+		return "", fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	metaData := fmt.Sprintf(`instance-id: %s
 local-hostname: %s
 `, instanceID, instanceID)
 	metaDataPath := filepath.Join(dir, "meta-data")
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
-		return "", fmt.Errorf("failed to write meta-data: %v", err)
+	if err := os.WriteFile(metaDataPath, []byte(metaData), 0600); err != nil {
+		return "", fmt.Errorf("failed to write meta-data: %w", err)
 	}
 
 	networkConfigPath := filepath.Join(dir, "network-config")
-	if err := os.WriteFile(networkConfigPath, []byte(networkConfig), 0644); err != nil {
-		return "", fmt.Errorf("failed to write meta-data: %v", err)
+	if err := os.WriteFile(networkConfigPath, []byte(networkConfig), 0600); err != nil {
+		return "", fmt.Errorf("failed to write meta-data: %w", err)
 	}
 
 	isoPath := filepath.Join(dir, "cidata.iso")
@@ -46,7 +46,7 @@ local-hostname: %s
 func mergeCloudConfig(userdata string) (string, error) {
 	var config map[string]interface{}
 	if err := yaml.Unmarshal([]byte(strings.TrimSpace(userdata)), &config); err != nil {
-		return userdata, fmt.Errorf("invalid YAML provided: %v", err)
+		return userdata, fmt.Errorf("invalid YAML provided: %w", err)
 	}
 
 	if config == nil {

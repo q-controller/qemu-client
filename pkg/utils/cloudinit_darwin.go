@@ -7,10 +7,11 @@ import (
 )
 
 func createCloudInitISOImpl(cloudInitPath, isoPath string) error {
+	//nolint:gosec // G204: building cloud-init ISO from caller-controlled paths
 	cmd := exec.Command("mkisofs", "-output", isoPath, "-volid", "cidata", "-joliet", "-rock",
-		fmt.Sprintf("%s/user-data", cloudInitPath),
-		fmt.Sprintf("%s/meta-data", cloudInitPath),
-		fmt.Sprintf("%s/network-config", cloudInitPath))
+		cloudInitPath+"/user-data",
+		cloudInitPath+"/meta-data",
+		cloudInitPath+"/network-config")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
