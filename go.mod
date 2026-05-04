@@ -1,6 +1,6 @@
 module github.com/q-controller/qemu-client
 
-go 1.25.5
+go 1.25.9
 
 require (
 	github.com/dustin/go-humanize v1.0.1
