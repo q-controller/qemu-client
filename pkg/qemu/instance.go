@@ -21,6 +21,14 @@ type Instance struct {
 	Done <-chan interface{}
 }
 
+// Binaries lets callers pin absolute paths to external tools the qemu
+// service shells out to. Empty fields fall back to PATH lookup.
+type Binaries struct {
+	Qemu       string // qemu-system-* — empty = utils.GetQemuBinary()
+	QemuImg    string // qemu-img        — empty = "qemu-img"
+	IsoCreator string // genisoimage / mkisofs — empty = platform default
+}
+
 type Config struct {
 	Cpus      uint32
 	Memory    uint32 // in MB
@@ -28,6 +36,7 @@ type Config struct {
 	HwAddr    string
 	Platform  *PlatformConfig // platform-specific configuration
 	CloudInit CloudInitConfig
+	Binaries  Binaries
 }
 
 // Path helpers — all runtime files live inside the instance directory.
@@ -109,9 +118,13 @@ func Attach(name, dir string, pid int) (*Instance, error) {
 }
 
 func Start(name, dir string, config Config) (*Instance, error) {
-	qemuBinary, qemuBinaryErr := utils.GetQemuBinary()
-	if qemuBinaryErr != nil {
-		return nil, qemuBinaryErr
+	qemuBinary := config.Binaries.Qemu
+	if qemuBinary == "" {
+		var err error
+		qemuBinary, err = utils.GetQemuBinary()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := exec.LookPath(qemuBinary); err != nil {
@@ -143,6 +156,8 @@ func Start(name, dir string, config Config) (*Instance, error) {
 		Dir(dir),
 		CloudInit(config.CloudInit),
 		Bios(bios),
+		IsoCreator(config.Binaries.IsoCreator),
+		QemuImg(config.Binaries.QemuImg),
 	)
 	if argsErr != nil {
 		return nil, argsErr

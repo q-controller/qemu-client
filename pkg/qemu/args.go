@@ -35,6 +35,8 @@ type QemuConfig struct {
 	CloudInit   CloudInitConfig
 	Hardware    Hardware
 	Bios        string
+	IsoCreator  string // absolute path; empty = platform default (genisoimage/mkisofs)
+	QemuImg     string // absolute path; empty = PATH lookup of "qemu-img"
 }
 
 type Option func(*QemuConfig)
@@ -105,6 +107,18 @@ func Bios(bios string) Option {
 	}
 }
 
+func IsoCreator(path string) Option {
+	return func(config *QemuConfig) {
+		config.IsoCreator = path
+	}
+}
+
+func QemuImg(path string) Option {
+	return func(config *QemuConfig) {
+		config.QemuImg = path
+	}
+}
+
 func BuildQemuArgs(opts ...Option) ([]string, error) {
 	config := &QemuConfig{
 		Machine: "q35",
@@ -127,13 +141,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	qgaPath := QgaSocketPath(config.Dir)
 	pidfilePath := PidfilePath(config.Dir)
 
-	image := utils.Image{
-		Path: imagePath,
-	}
-
-	if info, infoErr := image.Info(); infoErr == nil {
+	imageTool := utils.ImageTool{QemuImg: config.QemuImg}
+	if info, infoErr := imageTool.Info(imagePath); infoErr == nil {
 		if utils.BytesToMb(info.VirtualSizeBytes) < uint64(config.Hardware.Disk) {
-			if resizeErr := image.Resize(utils.MbToBytes(uint64(config.Hardware.Disk))); resizeErr != nil {
+			if resizeErr := imageTool.Resize(imagePath, utils.MbToBytes(uint64(config.Hardware.Disk))); resizeErr != nil {
 				return nil, resizeErr
 			}
 		}
@@ -168,7 +179,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		return nil, mkdirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.ID)
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.ID, config.IsoCreator)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
