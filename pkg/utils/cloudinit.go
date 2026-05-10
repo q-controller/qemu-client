@@ -10,7 +10,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func CreateCloudInitISO(userData, networkConfig, dir, instanceID string) (string, error) {
+// CreateCloudInitISO writes user-data/meta-data/network-config under dir
+// and packs them into cidata.iso. isoCreator is the absolute path to
+// genisoimage (linux) or mkisofs (darwin); empty means PATH lookup of the
+// platform default.
+func CreateCloudInitISO(userData, networkConfig, dir, instanceID, isoCreator string) (string, error) {
 	userDataPath := filepath.Join(dir, "user-data")
 	mergedUserData, mergeErr := mergeCloudConfig(userData)
 	if mergeErr != nil {
@@ -36,7 +40,7 @@ local-hostname: %s
 	}
 
 	isoPath := filepath.Join(dir, "cidata.iso")
-	if isoErr := createCloudInitISOImpl(dir, isoPath); isoErr != nil {
+	if isoErr := createCloudInitISOImpl(dir, isoPath, isoCreator); isoErr != nil {
 		return "", isoErr
 	}
 
