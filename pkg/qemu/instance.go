@@ -21,12 +21,14 @@ type Instance struct {
 	Done <-chan interface{}
 }
 
-// Binaries lets callers pin absolute paths to external tools the qemu
-// service shells out to. Empty fields fall back to PATH lookup.
+// Binaries lets callers pin absolute paths to external tools and firmware
+// the qemu service relies on. Empty fields fall back to PATH lookup for
+// binaries, or qemu's name-based -bios resolution for firmware.
 type Binaries struct {
 	Qemu       string // qemu-system-* — empty = utils.GetQemuBinary()
 	QemuImg    string // qemu-img        — empty = "qemu-img"
 	IsoCreator string // genisoimage / mkisofs — empty = platform default
+	Bios       string // absolute path to EDK2 firmware — empty = utils.GetBios()
 }
 
 type Config struct {
@@ -37,6 +39,12 @@ type Config struct {
 	Platform  *PlatformConfig // platform-specific configuration
 	CloudInit CloudInitConfig
 	Binaries  Binaries
+	// AllowEmulationFallback permits qemu to fall back to TCG software
+	// emulation when the hardware accelerator is unavailable. Currently
+	// only Linux/KVM is probed; on Darwin the flag is ignored because HVF
+	// has no cheap availability check. Default false; missing acceleration
+	// is a hard error.
+	AllowEmulationFallback bool
 }
 
 // Path helpers — all runtime files live inside the instance directory.
@@ -136,15 +144,24 @@ func Start(name, dir string, config Config) (*Instance, error) {
 		return nil, machineTypeErr
 	}
 
-	bios, biosErr := utils.GetBios()
-	if biosErr != nil {
-		return nil, biosErr
+	bios := config.Binaries.Bios
+	if bios == "" {
+		var biosErr error
+		bios, biosErr = utils.GetBios()
+		if biosErr != nil {
+			return nil, biosErr
+		}
+	}
+
+	accelerator, accelErr := utils.GetAccelerator(config.AllowEmulationFallback)
+	if accelErr != nil {
+		return nil, accelErr
 	}
 
 	args, argsErr := BuildQemuArgs(
 		ID(name),
 		Machine(machineType),
-		Accelerator(utils.GetAccelerator()),
+		Accelerator(accelerator),
 		Memory(config.Memory),
 		Disk(config.Disk),
 		Cpus(int(config.Cpus)),
