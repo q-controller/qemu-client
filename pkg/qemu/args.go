@@ -166,7 +166,14 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	args = append(args, netArgs...)
 
 	args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,wait=off", qmpPath))
-	args = append(args, "-cpu", "host")
+	// -cpu host requires a hardware accelerator (KVM/HVF) that can expose
+	// the host CPU directly to the guest. Under TCG the host CPU model is
+	// not available; "max" enables every feature TCG supports.
+	cpuModel := "host"
+	if config.Accelerator == "tcg" {
+		cpuModel = "max"
+	}
+	args = append(args, "-cpu", cpuModel)
 	args = append(args, "-smp", strconv.Itoa(config.Hardware.Cpus))
 	args = append(args, "-hda", imagePath)
 	args = append(args, "-pidfile", pidfilePath)
