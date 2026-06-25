@@ -175,7 +175,11 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	}
 	args = append(args, "-cpu", cpuModel)
 	args = append(args, "-smp", strconv.Itoa(config.Hardware.Cpus))
-	args = append(args, "-hda", imagePath)
+	// Attach the OS image over virtio-blk so it comes up as the primary
+	// disk (vda). The Ubuntu generic cloud image boots "initrdless": it
+	// ships no initramfs and relies on GRUB_FORCE_PARTUUID plus drivers
+	// built into the kernel.
+	args = append(args, "-drive", fmt.Sprintf("file=%s,if=virtio,format=qcow2", imagePath))
 	args = append(args, "-pidfile", pidfilePath)
 	args = append(args, "-device", "virtio-serial")
 	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", qgaPath))
