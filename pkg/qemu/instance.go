@@ -187,13 +187,14 @@ func Start(name, dir string, config Config) (*Instance, error) {
 	slog.Info("QEMU command", "binary", qemuBinary, "args", args)
 	command := exec.Command(qemuBinary, args...) //nolint:gosec // G204: spawning qemu with caller-built args is the purpose of this package
 
-	outFile, outFileErr := os.OpenFile(StdoutPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	// Truncate on each launch so the logs reflect only the current boot.
+	outFile, outFileErr := os.OpenFile(StdoutPath(dir), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if outFileErr != nil {
 		return nil, outFileErr
 	}
 	command.Stdout = outFile
 
-	errFile, errFileErr := os.OpenFile(StderrPath(dir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	errFile, errFileErr := os.OpenFile(StderrPath(dir), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if errFileErr != nil {
 		return nil, errFileErr
 	}
