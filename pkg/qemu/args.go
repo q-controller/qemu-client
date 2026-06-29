@@ -9,6 +9,21 @@ import (
 	"github.com/q-controller/qemu-client/pkg/utils"
 )
 
+// OSDiskNodeName and cloudInitNodeName are the stable block node-names for the
+// VM's disks. OSDiskNodeName is exported so callers can reference the OS disk
+// node directly. The matching file node and guest device id are derived with
+// fileNodeName and deviceID.
+const (
+	OSDiskNodeName    = "disk0"
+	cloudInitNodeName = "cloudinit0"
+)
+
+// fileNodeName is the protocol (file) node-name feeding a format node.
+func fileNodeName(node string) string { return node + "-file" }
+
+// deviceID is the guest virtio-blk device id for a disk node.
+func deviceID(node string) string { return "virtio-" + node }
+
 type NetworkConfig struct {
 	Driver string
 	Mac    string
@@ -179,7 +194,10 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	// disk (vda). The Ubuntu generic cloud image boots "initrdless": it
 	// ships no initramfs and relies on GRUB_FORCE_PARTUUID plus drivers
 	// built into the kernel.
-	args = append(args, "-drive", fmt.Sprintf("file=%s,if=virtio,format=qcow2", imagePath))
+	// Modern blockdev form: the qcow2 node gets a stable node-name (OSDiskNodeName).
+	args = append(args, "-blockdev", fmt.Sprintf("driver=file,node-name=%s,filename=%s", fileNodeName(OSDiskNodeName), imagePath))
+	args = append(args, "-blockdev", fmt.Sprintf("driver=qcow2,node-name=%s,file=%s", OSDiskNodeName, fileNodeName(OSDiskNodeName)))
+	args = append(args, "-device", fmt.Sprintf("virtio-blk,drive=%s,id=%s", OSDiskNodeName, deviceID(OSDiskNodeName)))
 	args = append(args, "-pidfile", pidfilePath)
 	args = append(args, "-device", "virtio-serial")
 	args = append(args, "-chardev", fmt.Sprintf("socket,path=%s,server=on,wait=off,id=charchannel0", qgaPath))
@@ -194,7 +212,9 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
-	args = append(args, "-drive", fmt.Sprintf("file=%s,format=raw,if=virtio", cloudInitPath))
+	args = append(args, "-blockdev", fmt.Sprintf("driver=file,node-name=%s,filename=%s", fileNodeName(cloudInitNodeName), cloudInitPath))
+	args = append(args, "-blockdev", fmt.Sprintf("driver=raw,node-name=%s,file=%s", cloudInitNodeName, fileNodeName(cloudInitNodeName)))
+	args = append(args, "-device", fmt.Sprintf("virtio-blk,drive=%s,id=%s", cloudInitNodeName, deviceID(cloudInitNodeName)))
 
 	if config.Bios != "" {
 		args = append(args, "-bios", config.Bios)
