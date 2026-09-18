@@ -18,7 +18,7 @@ type Instance struct {
 	QMP  string
 	QGA  string
 	Pid  int
-	Done <-chan interface{}
+	Done <-chan any
 }
 
 // Binaries lets callers pin absolute paths to external tools and firmware
@@ -103,7 +103,7 @@ func Attach(name, dir string, pid int) (*Instance, error) {
 		return nil, procErr
 	}
 
-	ch := make(chan interface{})
+	ch := make(chan any)
 
 	go func() {
 		defer close(ch)
@@ -211,7 +211,7 @@ func Start(name, dir string, config Config) (*Instance, error) {
 	}
 	slog.Debug("QEMU VM started", "pid", command.Process.Pid)
 
-	ch := make(chan interface{})
+	ch := make(chan any)
 
 	go func() {
 		defer close(ch)

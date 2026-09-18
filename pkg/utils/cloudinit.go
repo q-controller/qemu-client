@@ -48,13 +48,13 @@ local-hostname: %s
 }
 
 func mergeCloudConfig(userdata string) (string, error) {
-	var config map[string]interface{}
+	var config map[string]any
 	if err := yaml.Unmarshal([]byte(strings.TrimSpace(userdata)), &config); err != nil {
 		return userdata, fmt.Errorf("invalid YAML provided: %w", err)
 	}
 
 	if config == nil {
-		config = make(map[string]interface{})
+		config = make(map[string]any)
 	}
 
 	// Set resize_rootfs: true only if not present
@@ -64,7 +64,7 @@ func mergeCloudConfig(userdata string) (string, error) {
 
 	// Merge growpart only if not present
 	if _, exists := config["growpart"]; !exists {
-		growpart := make(map[string]interface{})
+		growpart := make(map[string]any)
 		growpart["mode"] = "auto"
 		growpart["devices"] = []string{"/"}
 		config["growpart"] = growpart
