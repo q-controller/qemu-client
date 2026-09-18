@@ -10,14 +10,14 @@ import (
 )
 
 // parseCloudConfig removes the #cloud-config header and parses the YAML content
-func parseCloudConfig(t *testing.T, content string) map[string]interface{} {
+func parseCloudConfig(t *testing.T, content string) map[string]any {
 	lines := strings.Split(content, "\n")
 	if len(lines) > 0 && strings.HasPrefix(lines[0], "#cloud-config") {
 		lines = lines[1:]
 	}
 	yamlContent := strings.Join(lines, "\n")
 
-	var config map[string]interface{}
+	var config map[string]any
 	err := yaml.Unmarshal([]byte(yamlContent), &config)
 	require.NoError(t, err, "Failed to parse YAML")
 	return config
@@ -33,10 +33,10 @@ func TestMergeCloudConfig_EmptyUserdata(t *testing.T) {
 	config := parseCloudConfig(t, result)
 	assert.Equal(t, true, config["resize_rootfs"])
 
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "auto", growpart["mode"])
-	devices, ok := growpart["devices"].([]interface{})
+	devices, ok := growpart["devices"].([]any)
 	require.True(t, ok, "devices should be an array")
 	assert.Equal(t, "/", devices[0])
 }
@@ -62,17 +62,17 @@ func TestMergeCloudConfig_ValidYAMLWithoutHeader(t *testing.T) {
 	config := parseCloudConfig(t, result)
 
 	// Should preserve user configuration
-	users, ok := config["users"].([]interface{})
+	users, ok := config["users"].([]any)
 	require.True(t, ok, "users should be an array")
 	require.Len(t, users, 1)
-	user, ok := users[0].(map[string]interface{})
+	user, ok := users[0].(map[string]any)
 	require.True(t, ok, "user should be a map")
 	assert.Equal(t, "testuser", user["name"])
 	assert.Equal(t, "/bin/bash", user["shell"])
 
 	// Should add resize configuration
 	assert.Equal(t, true, config["resize_rootfs"])
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "auto", growpart["mode"])
 }
@@ -92,10 +92,10 @@ growpart:
 
 	assert.Equal(t, false, config["resize_rootfs"])
 
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "manual", growpart["mode"])
-	devices, ok := growpart["devices"].([]interface{})
+	devices, ok := growpart["devices"].([]any)
 	require.True(t, ok, "devices should be an array")
 	assert.Equal(t, "/dev/sda1", devices[0])
 }
@@ -115,21 +115,21 @@ packages:
 
 	config := parseCloudConfig(t, result)
 
-	users, ok := config["users"].([]interface{})
+	users, ok := config["users"].([]any)
 	require.True(t, ok, "users should be an array")
 	require.Len(t, users, 1)
-	user, ok := users[0].(map[string]interface{})
+	user, ok := users[0].(map[string]any)
 	require.True(t, ok, "user should be a map")
 	assert.Equal(t, "testuser", user["name"])
 	assert.Equal(t, "ALL=(ALL) NOPASSWD:ALL", user["sudo"])
 
-	packages, ok := config["packages"].([]interface{})
+	packages, ok := config["packages"].([]any)
 	require.True(t, ok, "packages should be an array")
 	assert.Contains(t, packages, "git")
 	assert.Contains(t, packages, "vim")
 
 	assert.Equal(t, true, config["resize_rootfs"])
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "auto", growpart["mode"])
 }
@@ -143,7 +143,7 @@ func TestMergeCloudConfig_WhitespaceOnly(t *testing.T) {
 
 	config := parseCloudConfig(t, result)
 	assert.Equal(t, true, config["resize_rootfs"])
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "auto", growpart["mode"])
 }
@@ -165,18 +165,18 @@ resize_rootfs: false`
 
 	config := parseCloudConfig(t, result)
 
-	users, ok := config["users"].([]interface{})
+	users, ok := config["users"].([]any)
 	require.True(t, ok, "users should be an array")
 	require.Len(t, users, 1)
-	user, ok := users[0].(map[string]interface{})
+	user, ok := users[0].(map[string]any)
 	require.True(t, ok, "user should be a map")
 	assert.Equal(t, "ubuntu", user["name"])
 
-	keys, ok := user["ssh_authorized_keys"].([]interface{})
+	keys, ok := user["ssh_authorized_keys"].([]any)
 	require.True(t, ok, "ssh_authorized_keys should be an array")
 	assert.Contains(t, keys, "ssh-rsa AAAAB3...")
 
-	runcmd, ok := config["runcmd"].([]interface{})
+	runcmd, ok := config["runcmd"].([]any)
 	require.True(t, ok, "runcmd should be an array")
 	assert.Contains(t, runcmd, "echo 'Hello World'")
 
@@ -184,7 +184,7 @@ resize_rootfs: false`
 	assert.Equal(t, false, config["resize_rootfs"])
 
 	// Should add growpart only if missing
-	growpart, ok := config["growpart"].(map[string]interface{})
+	growpart, ok := config["growpart"].(map[string]any)
 	require.True(t, ok, "growpart should be a map")
 	assert.Equal(t, "auto", growpart["mode"])
 }

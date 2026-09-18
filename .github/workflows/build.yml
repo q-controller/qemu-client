@@ -17,20 +17,20 @@ jobs:
       GOOS: ${{ matrix.goos }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.4.0
+          version: v2.13.2
         env:
           GOOS: ${{ matrix.goos }}
       - name: Vulncheck
         run: |
-          GOOS= GOARCH= go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          GOOS= GOARCH= go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
           govulncheck ./...
       - name: Build Example
         run: go build -o /dev/null ./example
