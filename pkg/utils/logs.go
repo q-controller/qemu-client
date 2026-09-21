@@ -30,17 +30,9 @@ func (k Kind) String() string {
 	}
 }
 
-// Data is an internal change signal from the file watcher to the reader. Reset
-// is true when the stream was rotated (renamed or removed) and reading should
-// restart from the start of the file.
-type Data struct {
-	Kind  Kind
-	Reset bool
-}
-
 // Notification carries a chunk of new log output for a watched stream. Reset is
-// true for the first chunk after a rotation, signalling the consumer to discard
-// what it has shown so far for that stream.
+// true for the first chunk read from the start of a file that was truncated or
+// replaced since the previous chunk.
 type Notification struct {
 	Kind  Kind
 	Data  []byte
@@ -56,31 +48,39 @@ func (w *LogTailer) Close() error {
 	return w.watcher.Close()
 }
 
-// drainOffset reads bytes from the file at path starting at offset into the
+// cursor is the read position within a watched path together with the
+// identity of the file it was taken from.
+type cursor struct {
+	offset int64
+	file   os.FileInfo
+}
+
+// drainOffset reads bytes from the file at path starting at cur.offset into the
 // caller-provided buffer p, reading until p is full, EOF is reached, or ctx is
-// cancelled. It returns the number of bytes read and the offset to continue
+// cancelled. It returns the number of bytes read and the cursor to continue
 // from next time; io.EOF means the end of file was reached (with n < len(p)).
-// On cancellation it returns (0, offset, ctx.Err()); the call consumes nothing,
-// so the offset is left untouched.
-//
-// If the file has shrunk below offset (in-place truncation), reading restarts
-// from the beginning, so the returned offset may be lower than the one passed
-// in. The caller should store the returned offset rather than computing
-// offset+n itself.
-func drainOffset(ctx context.Context, path string, p []byte, offset int64) (int, int64, error) {
+// On cancellation it returns (0, cur, ctx.Err()); the call consumes nothing,
+// so the cursor is left untouched.
+// If the file at path is not the one the cursor was taken from (rotation) or
+// has shrunk below the offset (in-place truncation), reading restarts from the
+// beginning, so the returned offset may be lower than the one passed in.
+func drainOffset(ctx context.Context, path string, p []byte, cur cursor) (int, cursor, error) {
+	orig := cur
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, offset, err
+		return 0, orig, err
 	}
 	defer f.Close()
 
-	// If the file shrank below offset it was truncated; restart from 0.
-	if info, statErr := f.Stat(); statErr == nil && info.Size() < offset {
-		offset = 0
+	if info, statErr := f.Stat(); statErr == nil {
+		if (cur.file != nil && !os.SameFile(cur.file, info)) || info.Size() < cur.offset {
+			cur.offset = 0
+		}
+		cur.file = info
 	}
 
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return 0, offset, err
+	if _, err := f.Seek(cur.offset, io.SeekStart); err != nil {
+		return 0, orig, err
 	}
 
 	total := 0
@@ -88,17 +88,19 @@ func drainOffset(ctx context.Context, path string, p []byte, offset int64) (int,
 		// Bail out between reads if the caller cancelled; nothing consumed yet.
 		select {
 		case <-ctx.Done():
-			return 0, offset, ctx.Err()
+			return 0, orig, ctx.Err()
 		default:
 		}
 
 		n, err := f.Read(p[total:])
 		total += n
 		if err != nil {
-			return total, offset + int64(total), err // includes io.EOF
+			cur.offset += int64(total)
+			return total, cur, err // includes io.EOF
 		}
 	}
-	return total, offset + int64(total), nil
+	cur.offset += int64(total)
+	return total, cur, nil
 }
 
 // Notifications returns the channel of log chunks for the watched streams. It
@@ -125,7 +127,7 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 		}
 	}
 
-	events := make(chan Data)
+	events := make(chan Kind)
 	notifications := make(chan Notification)
 	go func() {
 		// Closing the watcher on exit makes ctx-cancel a complete teardown;
@@ -147,12 +149,8 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 				default:
 					continue
 				}
-				// A plain write just appends; anything else (rename,
-				// remove, chmod, ...) means the stream should be re-read
-				// from the start.
-				data := Data{Kind: kind, Reset: !event.Has(fsnotify.Write)}
 				select {
-				case events <- data:
+				case events <- kind:
 				case <-ctx.Done():
 					return
 				}
@@ -169,28 +167,25 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 
 	go func() {
 		defer close(notifications)
-		offsets := make(map[string]int64)
+		cursors := make(map[string]cursor)
 
 		// drain reads path to EOF, emitting a notification per chunk. It
 		// returns false when ctx is cancelled so the caller stops.
-		drain := func(kind Kind, path string, reset bool) bool {
-			if reset {
-				offsets[path] = 0
-			}
+		drain := func(kind Kind, path string) bool {
 			for {
 				buffer := make([]byte, 4096)
-				offset := offsets[path]
-				n, newOffset, err := drainOffset(ctx, path, buffer, offset)
-				offsets[path] = newOffset
+				cur := cursors[path]
+				n, next, err := drainOffset(ctx, path, buffer, cur)
+				cursors[path] = next
 				if n > 0 {
-					// newOffset < offset means drainOffset rewound (in-place
-					// truncation); tell the consumer to clear before appending.
+					// A chunk that starts at 0 while the cursor was further on
+					// means drainOffset rewound.
+					reset := cur.offset > 0 && next.offset == int64(n)
 					select {
-					case notifications <- Notification{Kind: kind, Data: buffer[:n], Reset: reset || newOffset < offset}:
+					case notifications <- Notification{Kind: kind, Data: buffer[:n], Reset: reset}:
 					case <-ctx.Done():
 						return false
 					}
-					reset = false // only the first chunk of a reset clears the view
 					continue
 				}
 				if ctx.Err() != nil {
@@ -204,7 +199,7 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 		}
 
 		// Emit the existing contents before following new output.
-		if !drain(KindStdout, stdout, false) || !drain(KindStderr, stderr, false) {
+		if !drain(KindStdout, stdout) || !drain(KindStderr, stderr) {
 			return
 		}
 
@@ -212,12 +207,12 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 			select {
 			case <-ctx.Done():
 				return
-			case event, ok := <-events:
+			case kind, ok := <-events:
 				if !ok {
 					return
 				}
 				var path string
-				switch event.Kind {
+				switch kind {
 				case KindStdout:
 					path = stdout
 				case KindStderr:
@@ -225,7 +220,7 @@ func NewLogTailer(ctx context.Context, stdout, stderr string) (*LogTailer, error
 				default:
 					continue
 				}
-				if !drain(event.Kind, path, event.Reset) {
+				if !drain(kind, path) {
 					return
 				}
 			}
