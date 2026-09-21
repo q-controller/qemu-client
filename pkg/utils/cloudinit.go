@@ -2,19 +2,20 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/diskfs/go-diskfs/backend/file"
+	"github.com/diskfs/go-diskfs/filesystem/iso9660"
 	"gopkg.in/yaml.v3"
 )
 
 // CreateCloudInitISO writes user-data/meta-data/network-config under dir
-// and packs them into cidata.iso. isoCreator is the absolute path to
-// genisoimage (linux) or mkisofs (darwin); empty means PATH lookup of the
-// platform default.
-func CreateCloudInitISO(userData, networkConfig, dir, instanceID, isoCreator string) (string, error) {
+// and packs them into cidata.iso.
+func CreateCloudInitISO(userData, networkConfig, dir, instanceID string) (string, error) {
 	userDataPath := filepath.Join(dir, "user-data")
 	mergedUserData, mergeErr := mergeCloudConfig(userData)
 	if mergeErr != nil {
@@ -40,11 +41,60 @@ local-hostname: %s
 	}
 
 	isoPath := filepath.Join(dir, "cidata.iso")
-	if isoErr := createCloudInitISOImpl(dir, isoPath, isoCreator); isoErr != nil {
+	if isoErr := writeISO(dir, isoPath, []string{"user-data", "meta-data", "network-config"}); isoErr != nil {
 		return "", isoErr
 	}
 
 	return isoPath, nil
+}
+
+// writeISO packs the named files under dir into a cidata ISO at isoPath.
+// Rock Ridge keeps the names as they are for the guest kernel; Joliet does
+// the same for guests that only read that.
+func writeISO(dir, isoPath string, names []string) error {
+	workspace, err := os.MkdirTemp("", "cidata")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+
+	iso, err := os.Create(isoPath)
+	if err != nil {
+		return err
+	}
+	defer iso.Close()
+
+	fs, err := iso9660.Create(file.New(iso, false), 0, 0, 0, workspace)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if err := addFile(fs, filepath.Join(dir, name), "/"+name); err != nil {
+			return fmt.Errorf("failed to add %s: %w", name, err)
+		}
+	}
+	return fs.Finalize(iso9660.FinalizeOptions{
+		RockRidge:        true,
+		Joliet:           true,
+		VolumeIdentifier: "cidata",
+	})
+}
+
+func addFile(fs *iso9660.FileSystem, src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := fs.OpenFile(dst, os.O_CREATE|os.O_RDWR)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func mergeCloudConfig(userdata string) (string, error) {

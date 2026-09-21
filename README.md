@@ -18,6 +18,3 @@ This project provides a lightweight Go package for interacting with the QEMU com
 ### Prerequisites
 - **QEMU**: Installed on your system (`qemu-system-x86_64` or equivalent).
 - **Disk Images**: A QEMU-compatible disk image (e.g., `.qcow2`) for each VM.
-- **Cloud Init**: If cloud init to be used, then some packages are required to be installed on a system:
-  * genisoimage (Linux)
-  * cdrtools (macOS)
