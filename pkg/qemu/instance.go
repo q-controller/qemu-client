@@ -25,10 +25,9 @@ type Instance struct {
 // the qemu service relies on. Empty fields fall back to PATH lookup for
 // binaries, or qemu's name-based -bios resolution for firmware.
 type Binaries struct {
-	Qemu       string // qemu-system-* — empty = utils.GetQemuBinary()
-	QemuImg    string // qemu-img        — empty = "qemu-img"
-	IsoCreator string // genisoimage / mkisofs — empty = platform default
-	Bios       string // absolute path to EDK2 firmware — empty = utils.GetBios()
+	Qemu    string // qemu-system-* - empty = utils.GetQemuBinary()
+	QemuImg string // qemu-img - empty = "qemu-img"
+	Bios    string // absolute path to EDK2 firmware - empty = utils.GetBios()
 }
 
 type Config struct {
@@ -173,7 +172,6 @@ func Start(name, dir string, config Config) (*Instance, error) {
 		Dir(dir),
 		CloudInit(config.CloudInit),
 		Bios(bios),
-		IsoCreator(config.Binaries.IsoCreator),
 		QemuImg(config.Binaries.QemuImg),
 	)
 	if argsErr != nil {

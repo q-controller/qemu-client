@@ -1,13 +1,42 @@
 package utils
 
 import (
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/diskfs/go-diskfs/backend/file"
+	"github.com/diskfs/go-diskfs/filesystem/iso9660"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+func TestCreateCloudInitISO(t *testing.T) {
+	dir := t.TempDir()
+	isoPath, err := CreateCloudInitISO("#cloud-config\nhostname: test\n", "version: 2\n", dir, "vm-1")
+	require.NoError(t, err)
+
+	info, err := os.Stat(isoPath)
+	require.NoError(t, err)
+	backend, err := file.OpenFromPath(isoPath, true)
+	require.NoError(t, err)
+	fs, err := iso9660.Read(backend, info.Size(), 0, 0)
+	require.NoError(t, err)
+
+	assert.Equal(t, "cidata", strings.TrimRight(fs.Label(), "\x00"))
+	for name, want := range map[string]string{
+		"meta-data":      "instance-id: vm-1\nlocal-hostname: vm-1\n",
+		"network-config": "version: 2\n",
+	} {
+		got, readErr := fs.ReadFile(name)
+		require.NoError(t, readErr, name)
+		assert.Equal(t, want, string(got), name)
+	}
+	userData, err := fs.ReadFile("user-data")
+	require.NoError(t, err)
+	assert.Equal(t, "test", parseCloudConfig(t, string(userData))["hostname"])
+}
 
 // parseCloudConfig removes the #cloud-config header and parses the YAML content
 func parseCloudConfig(t *testing.T, content string) map[string]any {

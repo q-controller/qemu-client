@@ -50,7 +50,6 @@ type QemuConfig struct {
 	CloudInit   CloudInitConfig
 	Hardware    Hardware
 	Bios        string
-	IsoCreator  string // absolute path; empty = platform default (genisoimage/mkisofs)
 	QemuImg     string // absolute path; empty = PATH lookup of "qemu-img"
 }
 
@@ -119,12 +118,6 @@ func Cpus(cpus int) Option {
 func Bios(bios string) Option {
 	return func(config *QemuConfig) {
 		config.Bios = bios
-	}
-}
-
-func IsoCreator(path string) Option {
-	return func(config *QemuConfig) {
-		config.IsoCreator = path
 	}
 }
 
@@ -208,7 +201,7 @@ func BuildQemuArgs(opts ...Option) ([]string, error) {
 		return nil, mkdirErr
 	}
 
-	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.ID, config.IsoCreator)
+	cloudInitPath, cloudInitErr := utils.CreateCloudInitISO(config.CloudInit.Userdata, config.CloudInit.NetworkConfig, cloudInitDir, config.ID)
 	if cloudInitErr != nil {
 		return nil, cloudInitErr
 	}
